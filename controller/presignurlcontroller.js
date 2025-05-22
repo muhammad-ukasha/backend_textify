@@ -27,7 +27,7 @@ const presignUrl = async (req, res) => {
     res.json({ url });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Error generating pre-signed URL." });
+    res.status(500).json({ error: "Error generating pre-signed URL." ,err});
   }
 };
 module.exports =  { presignUrl };

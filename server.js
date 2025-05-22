@@ -1,16 +1,16 @@
 // 📁 server.js
 
-const express = require('express');
-const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const fs = require('fs');
-const wav = require('wav');
-const http = require('http');
-const WebSocket = require('ws');
-const Routes = require('./router/index');
+const express = require("express");
+const mongoose = require("mongoose");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const fs = require("fs");
+const wav = require("wav");
+const http = require("http");
+const WebSocket = require("ws");
+const Routes = require("./router/index");
 // const { handleTranscriptionConnection, broadcastTranscription } = require('./controller/transcriptionController');
-const path = require('path');
+const path = require("path");
 // const cors = require('cors');
 // app.use(cors());
 
@@ -29,15 +29,17 @@ app.use(express.json());
 app.use(Routes);
 
 // Serve static files from the public directory
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public")));
 
 // 🔗 MongoDB Connection
-mongoose.connect(MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  // serverSelectionTimeoutMS: 10000,
-}).then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.log(`❌ DB Connection Error: ${err}`));
+mongoose
+  .connect(MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    // serverSelectionTimeoutMS: 10000,
+  })
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.log(`❌ DB Connection Error: ${err}`));
 
 // 🎙️ WebSocket Audio Handling
 // wss.on('connection', function connection(ws) {
@@ -71,7 +73,7 @@ mongoose.connect(MONGO_URI, {
 // transcriptionWss.on('connection', handleTranscriptionConnection);
 
 // 🚀 Start HTTP + WebSocket Server
-server.listen(PORT,'0.0.0.0', () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
   // console.log(`🔊 WebSocket listening at ws://localhost:${PORT}`);
 });
