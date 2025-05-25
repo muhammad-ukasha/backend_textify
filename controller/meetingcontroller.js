@@ -1,7 +1,21 @@
 // const nodemailer = require("nodemailer");
+const AWS = require("aws-sdk");
 const Meeting = require("../model/meetingModel");
 const User = require("../model/userModel");
 
+const s3 = new AWS.S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION,
+});
+function createS3Folder(Key) {
+  return s3
+    .putObject({
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: Key.endsWith("/") ? Key : `${Key}/`,
+    })
+    .promise();
+}
 // const transporter = nodemailer.createTransport({
 //   service: "gmail",
 //   auth: {
@@ -27,50 +41,63 @@ const addMeeting = async (req, res) => {
   } = req.body;
   const participantDocs = [];
   const participantsNotFound = [];
-  
+
   for (const email of participants) {
     const user = await User.findOne({ email });
-    
+
     if (user) {
       participantDocs.push({ user: user._id, attendanceStatus: "absent" });
     } else {
       participantsNotFound.push(email);
     }
   }
-  
+
+  const finalMeetingId = meetingId || generateMeetingId();
+  const baseFolder = `${finalMeetingId}/`;
+  const audioFolder = `${baseFolder}audio/`;
+  const transcriptionFolder = `${baseFolder}transcription/`;
+
+  // Create S3 folders
+  await Promise.all([
+    createS3Folder(baseFolder),
+    createS3Folder(audioFolder),
+    createS3Folder(transcriptionFolder),
+  ]);
+
   // Meeting is created regardless of participant match
   const newMeeting = new Meeting({
     title,
     date,
     time,
-    meetingId :meetingId || generateMeetingId(),
+    meetingId: finalMeetingId,
     organizer,
     subject,
     description,
     participants: participantDocs,
     status: status || "scheduled",
+    transcriptionFolderPath: transcriptionFolder,
   });
-  
-  try { 
+
+  try {
     const savedMeeting = await newMeeting.save();
-    console.log(savedMeeting)
+    console.log(savedMeeting);
 
     // Send emails only to matched participants
-    // for (const p of participantDocs) {
-    //   const user = await User.findById(p.user);
-    //   const mailOptions = {
-    //     from: "ukasham471@gmail.com",
-    //     to: user.email,
-    //     subject: "Meeting Invitation: " + subject,
-    //     text: `Dear ${user.firstname} ${user.lastname} ,\n\nYou are invited to a meeting on the topic: ${subject}.\n\nMeeting Title: ${title}\nDate: ${date}\nTime: ${time}\nMeeting ID: ${meetingId}\nOrganizer: ${organizer}\n\nBest regards,\nMeeting Organizer`,
-    //   };
+    for (const p of participantDocs) {
+      const user = await User.findById(p.user);
+      const mailOptions = {
+        from: "ukasham471@gmail.com",
+        to: user.email,
+        subject: "Meeting Invitation: " + subject,
+        text: `Dear ${user.firstname} ${user.lastname} ,\n\nYou are invited to a meeting on the topic: ${subject}.\n\nMeeting Title: ${title}\nDate: ${date}\nTime: ${time}\nMeeting ID: ${meetingId}\nOrganizer: ${organizer}\n\nBest regards,\nMeeting Organizer`,
+      };
 
-    //   try {
-    //     await transporter.sendMail(mailOptions);
-    //   } catch (err) {
-    //     console.error("Error sending email to", user.email, ":", err);
-    //   }
-    // }
+      try {
+        await transporter.sendMail(mailOptions);
+      } catch (err) {
+        console.log("Error sending email to", user.email, ":", err);
+      }
+    }
 
     return res.status(200).json({
       message: "Meeting created",
@@ -80,13 +107,18 @@ const addMeeting = async (req, res) => {
       meeting: savedMeeting,
     });
   } catch (err) {
-    res.status(500).json({ message: "Error creating meeting", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error creating meeting", error: err.message });
   }
 };
 
 const getMeetings = async (req, res) => {
   try {
-    const meetings = await Meeting.find().populate("participants.user", "firstname lastname email");
+    const meetings = await Meeting.find().populate(
+      "participants.user",
+      "firstname lastname email"
+    );
     res.status(200).json(meetings);
   } catch (error) {
     console.log(error);
@@ -229,12 +261,10 @@ const updateParticipants = async (req, res) => {
       }
     }
 
-    res
-      .status(200)
-      .json({
-        message: "Participants updated (added/removed) successfully",
-        meeting,
-      });
+    res.status(200).json({
+      message: "Participants updated (added/removed) successfully",
+      meeting,
+    });
   } catch (err) {
     res
       .status(500)
@@ -246,7 +276,7 @@ const updateAttendance = async (req, res) => {
   const { attendance } = req.body;
 
   try {
-    const meeting = await Meeting.findById(id).populate('participants.user');
+    const meeting = await Meeting.findById(id).populate("participants.user");
     if (!meeting) {
       return res.status(404).json({ message: "Meeting not found" });
     }
@@ -255,7 +285,9 @@ const updateAttendance = async (req, res) => {
     const notFound = [];
 
     attendance.forEach(({ email, status }) => {
-      const participant = meeting.participants.find(p => p.user.email === email);
+      const participant = meeting.participants.find(
+        (p) => p.user.email === email
+      );
       if (participant) {
         participant.attendanceStatus = status;
         updatedCount++;
@@ -272,8 +304,16 @@ const updateAttendance = async (req, res) => {
       meeting,
     });
   } catch (err) {
-    res.status(500).json({ message: "Error updating attendance", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error updating attendance", error: err.message });
   }
 };
 
-module.exports = { addMeeting, getMeetings, editMeeting, updateParticipants ,updateAttendance};
+module.exports = {
+  addMeeting,
+  getMeetings,
+  editMeeting,
+  updateParticipants,
+  updateAttendance,
+};

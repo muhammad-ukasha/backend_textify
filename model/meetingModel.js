@@ -16,6 +16,7 @@ const meetingSchema = new mongoose.Schema({
   meetingId: { type: String, required: true },
   organizer: { type: String, required: true },
   subject: { type: String, required: true },
+  transcriptionFolderPath: { type: String },
   //   when: { type: String, required: true },
   description: { type: String, required: true },
   status: {
