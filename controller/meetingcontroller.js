@@ -392,7 +392,7 @@ const deleteMeeting = async (req, res) => {
     const meeting = await Meeting.findByIdAndDelete(id);
 
     if (!meeting) {
-      return res.status(404).json({ message: "Meeting not found" });
+      return res.status(404).json({ message: "Meeting not found1" });
     }
 
     res.status(200).json({ message: "Meeting deleted successfully" });
