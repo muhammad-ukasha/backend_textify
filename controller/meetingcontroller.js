@@ -58,11 +58,7 @@ const addMeeting = async (req, res) => {
   const transcriptionFolder = `${baseFolder}transcription/`;
 
   // Create S3 folders
-  await Promise.all([
-    createS3Folder(baseFolder),
-    createS3Folder(audioFolder),
-    createS3Folder(transcriptionFolder),
-  ]);
+
 
   // Meeting is created regardless of participant match
   const newMeeting = new Meeting({
@@ -81,7 +77,11 @@ const addMeeting = async (req, res) => {
   try {
     const savedMeeting = await newMeeting.save();
     console.log(savedMeeting);
-
+    await Promise.all([
+      createS3Folder(baseFolder),
+      createS3Folder(audioFolder),
+      createS3Folder(transcriptionFolder),
+    ]);
     // Send emails only to matched participants
     for (const p of participantDocs) {
       const user = await User.findById(p.user);
