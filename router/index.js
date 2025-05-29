@@ -13,5 +13,7 @@ const api = process.env.API
 router.use(api, signUpUser);
 router.use(api, awsUrl);
 router.use(api, meeting);
+router.use(api, aurdino);
+
 
 module.exports = router;

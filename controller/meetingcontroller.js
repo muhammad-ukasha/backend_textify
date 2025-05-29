@@ -1,4 +1,4 @@
-// const nodemailer = require("nodemailer");
+const nodemailer = require("nodemailer");
 const AWS = require("aws-sdk");
 const Meeting = require("../model/meetingModel");
 const User = require("../model/userModel");
@@ -16,13 +16,13 @@ function createS3Folder(Key) {
     })
     .promise();
 }
-// const transporter = nodemailer.createTransport({
-//   service: "gmail",
-//   auth: {
-//     user: process.env.EMAIL,
-//     pass: process.env.EMAIL_PASSWORD,
-//   },
-// });
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+});
 
 const addMeeting = async (req, res) => {
   function generateMeetingId() {
@@ -89,7 +89,7 @@ const addMeeting = async (req, res) => {
         from: "ukasham471@gmail.com",
         to: user.email,
         subject: "Meeting Invitation: " + subject,
-        text: `Dear ${user.firstname} ${user.lastname} ,\n\nYou are invited to a meeting on the topic: ${subject}.\n\nMeeting Title: ${title}\nDate: ${date}\nTime: ${time}\nMeeting ID: ${meetingId}\nOrganizer: ${organizer}\n\nBest regards,\nMeeting Organizer`,
+        text: `Dear ${user.firstname} ${user.lastname} ,\n\nYou are invited to a meeting on the topic: ${subject}.\n\nMeeting Title: ${title}\nDate: ${date}\nTime: ${time}\nMeeting ID: ${finalMeetingId}\nOrganizer: ${organizer}\n\nBest regards,\nMeeting Organizer`,
       };
 
       try {
@@ -209,10 +209,10 @@ const updateParticipants = async (req, res) => {
         });
 
         const mailOptions = {
-          from: "your-email@gmail.com",
+          from: "ukasham471@gmail.com",
           to: user.email,
           subject: "Meeting Invitation: " + meeting.subject,
-          text: `Dear ${user.name},\n\nYou have been added to a meeting:\n\nMeeting Title: ${meeting.title}\nDate: ${meeting.date}\nTime: ${meeting.time}\nMeeting ID: ${meeting.meetingId}\nOrganizer: ${meeting.organizer}\n\nBest regards,\nMeeting Organizer`,
+          text: `Dear ${user.firstname} ${user.lastname },\n\nYou have been added to a meeting:\n\nMeeting Title: ${meeting.title}\nDate: ${meeting.date}\nTime: ${meeting.time}\nMeeting ID: ${meeting.meetingId}\nOrganizer: ${meeting.organizer}\n\nBest regards,\nMeeting Organizer`,
         };
 
         try {
@@ -309,11 +309,106 @@ const updateAttendance = async (req, res) => {
       .json({ message: "Error updating attendance", error: err.message });
   }
 };
+const fetchTranscriptionAndSave = async (req, res) => {
+  const { id } = req.params;
 
+  try {
+    const meeting = await Meeting.findById(id);
+    if (!meeting || !meeting.transcriptionFolderPath) {
+      return res
+        .status(404)
+        .json({ message: "Meeting or transcription folder not found" });
+    }
+
+    const s3Params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Prefix: meeting.transcriptionFolderPath,
+    };
+
+    const list = await s3.listObjectsV2(s3Params).promise();
+    const keys = list.Contents.map((obj) => obj.Key);
+
+    // Filter for text or JSON files
+    const transcriptionKeys = keys.filter(
+      (k) => k.endsWith(".txt") || k.endsWith(".json")
+    );
+    if (transcriptionKeys.length === 0) {
+      return res.status(404).json({ message: "No transcription files found" });
+    }
+
+    // Read and concatenate all transcriptions
+    let fullTranscription = "";
+    for (const key of transcriptionKeys) {
+      const data = await s3
+        .getObject({ Bucket: s3Params.Bucket, Key: key })
+        .promise();
+      fullTranscription += `\n\n--- ${key} ---\n${data.Body.toString("utf-8")}`;
+    }
+
+    // Save to MongoDB
+    meeting.transcription = fullTranscription;
+    await meeting.save();
+
+    res.status(200).json({
+      message: "Transcription saved",
+      transcription: fullTranscription,
+    });
+  } catch (err) {
+    console.error("Error fetching transcription:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+const updateMeetingStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!["scheduled", "started", "completed"].includes(status)) {
+    return res.status(400).json({ message: "Invalid status value" });
+  }
+
+  try {
+    const meeting = await Meeting.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    );
+
+    if (!meeting) {
+      return res.status(404).json({ message: "Meeting not found" });
+    }
+
+    res.status(200).json({ message: "Status updated", meeting });
+  } catch (err) {
+    console.error("Error updating meeting status:", err);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: err.message });
+  }
+};
+const deleteMeeting = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const meeting = await Meeting.findByIdAndDelete(id);
+
+    if (!meeting) {
+      return res.status(404).json({ message: "Meeting not found" });
+    }
+
+    res.status(200).json({ message: "Meeting deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting meeting:", err);
+    res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
 module.exports = {
   addMeeting,
   getMeetings,
   editMeeting,
   updateParticipants,
   updateAttendance,
+  fetchTranscriptionAndSave,
+  updateMeetingStatus,
+  deleteMeeting,
+  
 };

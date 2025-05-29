@@ -1,32 +1,44 @@
-const fs = require("fs");
-const path = require ("path");
 
-const axios = require("axios");
+ let esp32Status = {
+  meetingId: null,
+  meetingCount: 0,
+  recordingStatus: "stopped", // or "recording"
+};   // Store latest status
+let pendingCommands = []; 
 
+const aurdinoStatues = (req, res) => {
+  const { meetingId, meetingCount, recordingStatus } = req.body;
+  if (
+    typeof meetingId !== 'string' ||
+    typeof meetingCount !== 'number' ||
+    typeof recordingStatus !== 'string'
+  ) {
+    return res.status(400).json({ error: 'Invalid status payload' });
+  }
 
-const getAudio = async (req, res) => {
-    // console.log('File received:', req.file);
-    
-    // res.status(200).send('File uploaded successfully')
-    // console.log(req)  
-  const filePath = path.join(__dirname, "uploads", req.file.filename);
+  esp32Status.meetingId = meetingId;
+  esp32Status.meetingCount = meetingCount;
+  esp32Status.recordingStatus = recordingStatus;
 
-  console.log(`📥 Received file: ${filePath}`);
+  return res.json({ success: true });
 
-//   OPTIONAL: Upload to S3 using presigned URL
-//   try {
-//     const presignedUrlRes = await axios.get(
-//       `https://localhost:3000/api/v1/presigned-url?filename=${req.file.filename}`
-//     );
-//     await axios.put(presignedUrlRes.data.url, fs.readFileSync(filePath), {
-//       headers: { "Content-Type": "audio/wav" },
-//     });
-//     console.log("✅ Uploaded to S3");
-//   } catch (err) {
-//     console.error("❌ Failed to upload to S3", err);
-//   }
-
-//   res.json({ status: "success" });
 };
 
-module.exports = { getAudio };
+const sendCommand = (req, res) => {
+  const cmd = req.body;
+  console.log(req.body)
+  pendingCommands.push(cmd);
+  res.send({ success: true });
+};
+const fetchCommand = (req, res) => {
+  const commandsToSend = [...pendingCommands];
+  console.log("commandsToSend",commandsToSend)
+  pendingCommands = [];
+  res.json(commandsToSend);
+};
+const getStatus =  (req, res) => {
+  res.json(esp32Status);
+}
+module.exports = {
+aurdinoStatues,getStatus,fetchCommand,sendCommand
+}

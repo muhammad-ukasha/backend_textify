@@ -18,7 +18,11 @@ const storage = multer.diskStorage({
   // }
 });
 
-const upload = multer({ storage });
-router.post("/upload", upload.single("audio"), aurdino.getAudio);
+// router.post("/upload", upload.single("audio"), aurdino.getAudio);
+router.post("/commands" , aurdino.sendCommand)
+router.get("/commands" , aurdino.fetchCommand)
+router.post("/esp32/status" , aurdino.aurdinoStatues)
+router.get("/esp32/status" , aurdino.getStatus)
+
 
 module.exports = router;

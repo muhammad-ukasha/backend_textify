@@ -21,7 +21,7 @@ const meetingSchema = new mongoose.Schema({
   description: { type: String, required: true },
   status: {
     type: String,
-    enum: ["scheduled", "completed", "cancelled"],
+    enum: ["scheduled", "started", "completed"],
     default: "scheduled",
   },
   participants: [participantSchema], // Embedding the participant model
